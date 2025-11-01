@@ -23,24 +23,21 @@ namespace MyExcelMAUIApp.Models
             for (int i = 0; i < maxIterations; i++)
             {
                 bool wasChanged = false;
-                // 1. Створюємо копію поточних значень ЯК КОНТЕКСТ для цієї ітерації
                 var valuesContext = cells.ToDictionary(kvp => kvp.Key, kvp => kvp.Value.Value);
 
-                // 2. Створюємо копію ключів для безпечної ітерації
                 var addressesToCalculate = cells.Keys.ToList();
 
                 foreach (string address in addressesToCalculate)
                 {
                     if (!cells.TryGetValue(address, out Cell currentCell)) continue;
 
-                    object? oldValue = currentCell.Value; // Використовуємо object?
+                    object? oldValue = currentCell.Value;
                     object? newValue;
 
                     if (string.IsNullOrWhiteSpace(currentCell.Expression))
                     {
                         newValue = null;
                     }
-                    // 3. Передаємо СЛОВНИК valuesContext як контекст
                     else if (currentCell.Expression.StartsWith("="))
                     {
                         newValue = Calculator.Evaluate(currentCell.Expression.Substring(1), valuesContext);
@@ -59,7 +56,6 @@ namespace MyExcelMAUIApp.Models
                     if (!Equals(oldValue, newValue))
                     {
                         currentCell.Value = newValue;
-                        // 4. Оновлюємо КОНТЕКСТ для наступних обчислень В ЦІЙ ІТЕРАЦІЇ
                         valuesContext[address] = newValue;
                         wasChanged = true;
                     }

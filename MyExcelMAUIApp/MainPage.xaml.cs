@@ -1,7 +1,7 @@
 ﻿using Microsoft.Maui.Controls;
 using MyExcelMAUIApp.Models;
 using System.IO;
-using System.Linq; 
+using System.Linq;
 
 namespace MyExcelMAUIApp
 {
@@ -29,6 +29,7 @@ namespace MyExcelMAUIApp
 
         private void AddColumnsAndColumnLabels()
         {
+            grid.RowDefinitions.Add(new RowDefinition());
             for (int col = 0; col < CountColumn + 1; col++)
             {
                 grid.ColumnDefinitions.Add(new ColumnDefinition());
@@ -49,18 +50,25 @@ namespace MyExcelMAUIApp
 
         private void AddRowsAndCellEntries()
         {
-            for (int row = 0; row < CountRow; row++)
+            for (int i = 0; i < CountRow; i++)
             {
                 grid.RowDefinitions.Add(new RowDefinition());
+            }
+
+            for (int row = 0; row < CountRow; row++)
+            {
+                int gridRowIndex = row + 1;
+
                 var label = new Label
                 {
                     Text = (row + 1).ToString(),
                     VerticalOptions = LayoutOptions.Center,
                     HorizontalOptions = LayoutOptions.Center
                 };
-                Grid.SetRow(label, row + 1);
+                Grid.SetRow(label, gridRowIndex);
                 Grid.SetColumn(label, 0);
                 grid.Children.Add(label);
+
                 for (int col = 0; col < CountColumn; col++)
                 {
                     var entry = new Entry
@@ -72,7 +80,8 @@ namespace MyExcelMAUIApp
                     entry.Unfocused += Entry_Unfocused;
                     entry.Focused += Entry_Focused;
                     entry.Completed += Entry_Completed;
-                    Grid.SetRow(entry, row + 1);
+
+                    Grid.SetRow(entry, gridRowIndex);
                     Grid.SetColumn(entry, col + 1);
                     grid.Children.Add(entry);
                     string cellAddress = GetColumnName(col + 1) + (row + 1);
@@ -203,10 +212,10 @@ namespace MyExcelMAUIApp
                 string[] fileNames = savedFilesPaths.Select(Path.GetFileName).ToArray();
 
                 string selectedFileName = await DisplayActionSheet(
-                    "Оберіть файл для відкриття", 
-                    "Скасувати",                  
-                    null,                         
-                    fileNames);                 
+                    "Оберіть файл для відкриття",
+                    "Скасувати",
+                    null,
+                    fileNames);
 
                 if (string.IsNullOrEmpty(selectedFileName) || selectedFileName == "Скасувати")
                 {
@@ -229,40 +238,74 @@ namespace MyExcelMAUIApp
         private void DeleteRowButton_Clicked(object sender, EventArgs e)
         {
             if (grid.RowDefinitions.Count <= 1) return;
-            int rowToDelete = grid.RowDefinitions.Count;
-            spreadsheet.OnRowDeleted(rowToDelete);
-            var elementsToRemove = grid.Children.Where(c => Grid.GetRow((BindableObject)c) == rowToDelete - 1).ToList();
-            foreach (var element in elementsToRemove) { grid.Children.Remove(element); }
-            grid.RowDefinitions.RemoveAt(rowToDelete - 1);
+
+            int gridRowIndexToDelete = grid.RowDefinitions.Count - 1;
+            int modelRowNumberToDelete = gridRowIndexToDelete;
+
+            for (int col = 0; col < CountColumn; col++)
+            {
+                string cellAddress = GetColumnName(col + 1) + modelRowNumberToDelete;
+                if (uiCells.ContainsKey(cellAddress))
+                {
+                    uiCells.Remove(cellAddress);
+                }
+            }
+            spreadsheet.OnRowDeleted(modelRowNumberToDelete);
+            var elementsToRemove = grid.Children
+                .Where(c => Grid.GetRow((BindableObject)c) == gridRowIndexToDelete)
+                .ToList();
+
+            foreach (var element in elementsToRemove)
+            {
+                grid.Children.Remove(element);
+            }
+            grid.RowDefinitions.RemoveAt(gridRowIndexToDelete);
             updateGridDisplay();
         }
 
         private void DeleteColumnButton_Clicked(object sender, EventArgs e)
         {
             if (grid.ColumnDefinitions.Count <= 1) return;
-            int columnToDelete = grid.ColumnDefinitions.Count - 1;
-            spreadsheet.OnColumnDeleted(GetColumnName(columnToDelete));
-            var elementsToRemove = grid.Children.Where(c => Grid.GetColumn((BindableObject)c) == columnToDelete).ToList();
+
+            int gridColumnIndexToDelete = grid.ColumnDefinitions.Count - 1;
+            int modelColumnNumberToDelete = gridColumnIndexToDelete;
+            spreadsheet.OnColumnDeleted(GetColumnName(modelColumnNumberToDelete));
+            for (int row = 1; row <= grid.RowDefinitions.Count - 1; row++)
+            {
+                string address = GetColumnName(modelColumnNumberToDelete) + row;
+                if (uiCells.ContainsKey(address))
+                {
+                    uiCells.Remove(address);
+                }
+            }
+            var elementsToRemove = grid.Children
+                .Where(c => Grid.GetColumn((BindableObject)c) == gridColumnIndexToDelete)
+                .ToList();
+
             foreach (var element in elementsToRemove) { grid.Children.Remove(element); }
-            grid.ColumnDefinitions.RemoveAt(columnToDelete);
+            grid.ColumnDefinitions.RemoveAt(gridColumnIndexToDelete);
             updateGridDisplay();
         }
 
         private void AddRowButton_Clicked(object sender, EventArgs e)
         {
-            int newRow = grid.RowDefinitions.Count;
+            int newRowIndexAndNumber = grid.RowDefinitions.Count;
+
             grid.RowDefinitions.Add(new RowDefinition());
             var label = new Label
             {
-                Text = newRow.ToString(),
+                Text = newRowIndexAndNumber.ToString(),
                 VerticalOptions = LayoutOptions.Center,
                 HorizontalOptions = LayoutOptions.Center
             };
-            Grid.SetRow(label, newRow);
+
+            Grid.SetRow(label, newRowIndexAndNumber); 
             Grid.SetColumn(label, 0);
             grid.Children.Add(label);
+
             for (int col = 0; col < CountColumn; col++)
             {
+                int modelColumnNumber = col + 1;
                 var entry = new Entry
                 {
                     Text = "",
@@ -270,27 +313,35 @@ namespace MyExcelMAUIApp
                     HorizontalOptions = LayoutOptions.Center
                 };
                 entry.Unfocused += Entry_Unfocused;
-                Grid.SetRow(entry, newRow);
-                Grid.SetColumn(entry, col + 1);
+                entry.Focused += Entry_Focused;
+                entry.Completed += Entry_Completed;
+
+                Grid.SetRow(entry, newRowIndexAndNumber); 
+                Grid.SetColumn(entry, modelColumnNumber);
                 grid.Children.Add(entry);
+
+                string cellAddress = GetColumnName(modelColumnNumber) + newRowIndexAndNumber;
+                uiCells[cellAddress] = entry; 
             }
         }
 
         private void AddColumnButton_Clicked(object sender, EventArgs e)
         {
-            int newColumn = grid.ColumnDefinitions.Count;
+            int newColumnIndexAndNumber = grid.ColumnDefinitions.Count;
+
             grid.ColumnDefinitions.Add(new ColumnDefinition());
             var label = new Label
             {
-                Text = GetColumnName(newColumn),
+                Text = GetColumnName(newColumnIndexAndNumber),
                 VerticalOptions = LayoutOptions.Center,
                 HorizontalOptions = LayoutOptions.Center
             };
             Grid.SetRow(label, 0);
-            Grid.SetColumn(label, newColumn);
+            Grid.SetColumn(label, newColumnIndexAndNumber);
             grid.Children.Add(label);
-            for (int row = 0; row < CountRow; row++)
+            for (int row = 0; row < grid.RowDefinitions.Count - 1; row++)
             {
+                int modelRowNumber = row + 1;
                 var entry = new Entry
                 {
                     Text = "",
@@ -298,17 +349,18 @@ namespace MyExcelMAUIApp
                     HorizontalOptions = LayoutOptions.Center
                 };
                 entry.Unfocused += Entry_Unfocused;
-                Grid.SetRow(entry, row + 1);
-                Grid.SetColumn(entry, newColumn);
+                entry.Focused += Entry_Focused;
+                entry.Completed += Entry_Completed;
+
+                Grid.SetRow(entry, modelRowNumber);
+                Grid.SetColumn(entry, newColumnIndexAndNumber); 
                 grid.Children.Add(entry);
+
+                string cellAddress = GetColumnName(newColumnIndexAndNumber) + modelRowNumber;
+                uiCells[cellAddress] = entry;
             }
         }
 
-        private void CalculateButton_Clicked(object sender, EventArgs e)
-        {
-            updateGridDisplay();
-            DisplayAlert("Готово", "Відображення таблиці оновлено.", "OK");
-        }
         private async void HelpButton_Clicked(object sender, EventArgs e)
         {
             await DisplayAlert("Довідка", "Лабораторна робота 1. Студента Миколи Шевченка", "OK");
